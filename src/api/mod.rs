@@ -1,7 +1,8 @@
 use serde_json::Value;
 use anyhow::Result;
+use crate::model::Post;
 
-async fn get_posts(subreddit: &str) -> Result<Vec<Post>> {
+pub async fn get_posts(subreddit: &str) -> Result<Vec<Post>> {
     let data: Value = surf::get(format!("https://www.reddit.com/r/{}/hot.json", subreddit))
         .set_header("User-agent", "RTS 0.1")
         .recv_json()
