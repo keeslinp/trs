@@ -47,7 +47,9 @@ pub fn render<B: Backend>(terminal: &mut Terminal<B>, state: &State) -> Result<(
             View::Loading => {
                 render_loading(f);
             }
-            View::SubList(_) => {}
+            View::SubList(ref posts) => {
+                render_subreddit_view(f, posts.as_slice());
+            }
         };
     })?;
     Ok(())
