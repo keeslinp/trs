@@ -1,32 +1,34 @@
 use anyhow::Result;
+use futures::executor::ThreadPool;
 use std::io;
 use termion::raw::IntoRawMode;
 use tui::{backend::TermionBackend, Terminal};
-use futures::executor::ThreadPool;
 
+mod api;
 mod model;
 mod msg;
 mod render;
 mod state;
 mod update;
-mod api;
 
+use msg::Msg;
 use render::render;
 use state::State;
 use update::update;
-use msg::Msg;
 
 fn handle_input(tx: flume::Sender<Msg>) {
     use std::thread::JoinHandle;
 
     let _: JoinHandle<Result<()>> = std::thread::spawn(move || {
-        use termion::{input::TermRead, event::Key};
+        use termion::{event::Key, input::TermRead};
         let stdin = io::stdin();
         let lock = stdin.lock();
         for key in lock.keys() {
             match key? {
                 Key::Char('q') => tx.send(Msg::Quit)?,
-                _ => {},
+                Key::Char('j') => tx.send(Msg::Down)?,
+                Key::Char('k') => tx.send(Msg::Up)?,
+                _ => {}
             }
         }
         Ok(())
@@ -42,9 +44,10 @@ fn main() -> Result<()> {
     let pool = ThreadPool::new()?;
     handle_input(tx.clone());
     tx.send(Msg::FetchSubreddit("rust".to_owned()))?;
+    terminal.clear()?;
     for msg in rx.iter() {
         update(msg, &mut state, tx.clone(), pool.clone())?;
-        render(&mut terminal, &state);
+        render(&mut terminal, &mut state);
     }
     Ok(())
 }

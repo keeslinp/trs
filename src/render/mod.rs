@@ -1,15 +1,23 @@
 use tui::{
     backend::Backend,
     layout::{Constraint, Direction, Layout},
-    text::{Span},
-    widgets::{Block, Borders, List, Paragraph, ListItem},
+    style::{Color, Modifier, Style},
+    text::{Span, Text},
+    widgets::{Block, Borders, List, ListItem, ListState, Paragraph},
     Frame, Terminal,
 };
 
-use crate::{model::Post, state::{State, View}};
+use crate::{
+    model::Post,
+    state::{State, View},
+};
 use anyhow::Result;
 
-fn render_subreddit_view<B: Backend>(f: &mut Frame<B>, posts: &[Post]) {
+fn render_subreddit_view<'a, B: Backend>(
+    f: &mut Frame<B>,
+    posts: &[Post],
+    list_state: &mut ListState,
+) {
     let items: Vec<ListItem> = posts
         .iter()
         .map(|p| ListItem::new(p.title.as_str()))
@@ -17,22 +25,20 @@ fn render_subreddit_view<B: Backend>(f: &mut Frame<B>, posts: &[Post]) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .margin(1)
-        .constraints(
-            [
-                Constraint::Percentage(80),
-                Constraint::Percentage(10),
-                Constraint::Percentage(10),
-            ]
-            .as_ref(),
-        )
+        .constraints([Constraint::Percentage(80), Constraint::Percentage(10)].as_ref())
         .split(f.size());
-    let block = Block::default().title("Block").borders(Borders::ALL);
-    let list = List::new(items);
-    f.render_widget(list, block.inner(chunks[0]));
+    let block = Block::default();
+    let list = List::new(items)
+        .block(Block::default().borders(Borders::ALL).title("List"))
+        .style(Style::default().fg(Color::White))
+        .highlight_style(
+            Style::default()
+                .bg(Color::LightGreen)
+                .add_modifier(Modifier::BOLD),
+        )
+        .highlight_symbol(">> ");
+    f.render_stateful_widget(list, block.inner(chunks[0]), list_state);
     f.render_widget(block, chunks[0]);
-    let var_name = Block::default().title("Block 2").borders(Borders::ALL);
-    let block = var_name;
-    f.render_widget(block, chunks[1]);
 }
 
 fn render_loading<B: Backend>(f: &mut Frame<B>) {
@@ -40,15 +46,14 @@ fn render_loading<B: Backend>(f: &mut Frame<B>) {
     f.render_widget(text, f.size());
 }
 
-pub fn render<B: Backend>(terminal: &mut Terminal<B>, state: &State) -> Result<()> {
-    terminal.clear()?;
+pub fn render<B: Backend>(terminal: &mut Terminal<B>, state: &mut State) -> Result<()> {
     terminal.draw(|f| {
         match state.view_state {
             View::Loading => {
                 render_loading(f);
             }
-            View::SubList(ref posts) => {
-                render_subreddit_view(f, posts.as_slice());
+            View::SubList(ref posts, ref mut list_state) => {
+                render_subreddit_view(f, posts, list_state);
             }
         };
     })?;

@@ -1,6 +1,8 @@
 use crate::model::Post;
+use tui::widgets::ListState;
+
 pub enum View {
-    SubList(Vec<Post>),
+    SubList(Vec<Post>, ListState),
     Loading,
 }
 
