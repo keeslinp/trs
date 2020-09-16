@@ -3,6 +3,10 @@ use futures::executor::ThreadPool;
 use std::io;
 use termion::raw::IntoRawMode;
 use tui::{backend::TermionBackend, Terminal};
+use futures::{
+    future::RemoteHandle,
+    task::{Spawn, SpawnExt},
+};
 
 mod api;
 mod model;
@@ -43,10 +47,14 @@ fn main() -> Result<()> {
     let (tx, rx) = flume::unbounded();
     let pool = ThreadPool::new()?;
     handle_input(tx.clone());
-    tx.send(Msg::FetchSubreddit("rust".to_owned()))?;
+    tx.send(Msg::FetchSubreddit(None))?;
     terminal.clear()?;
     for msg in rx.iter() {
-        update(msg, &mut state, tx.clone(), pool.clone())?;
+        let maybe_future = update(msg, &mut state, tx.clone())?;
+        if let Some(future) = maybe_future {
+            let handle: RemoteHandle<Result<()>> = pool.spawn_with_handle(future)?;
+            handle.forget();
+        }
         render(&mut terminal, &mut state);
     }
     Ok(())
