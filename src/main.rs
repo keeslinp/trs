@@ -32,6 +32,7 @@ fn handle_input(tx: flume::Sender<Msg>) {
                 Key::Char('q') => tx.send(Msg::Quit)?,
                 Key::Char('j') => tx.send(Msg::Down)?,
                 Key::Char('k') => tx.send(Msg::Up)?,
+                Key::Char('\n') => tx.send(Msg::Select)?,
                 _ => {}
             }
         }

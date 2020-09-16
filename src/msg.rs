@@ -7,5 +7,6 @@ pub enum Msg {
     Error(String),
     Down,
     Up,
+    Select,
     Quit,
 }

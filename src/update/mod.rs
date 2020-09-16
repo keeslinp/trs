@@ -55,6 +55,15 @@ pub fn update(msg: Msg, state: &mut State, tx: Sender<Msg>) -> Result<Option<imp
         Msg::Quit => {
             bail!("Quitting"); // TODO: Better quiting path
         }
+        Msg::Select => match &state.view_state {
+            View::SubList(posts, list_state) => {
+                if let Some(url) = list_state.selected().and_then(|i| posts.get(i)).map(|post| post.url.as_str()).and_then(|s| s.strip_prefix("\"")).and_then(|s| s.strip_suffix("\"")) {
+                    webbrowser::open(url)?;
+                }
+            },
+            View::Loading => {},
+            
+        }
     }
     Ok(None)
 }
