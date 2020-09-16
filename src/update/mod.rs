@@ -38,7 +38,7 @@ pub fn update(msg: Msg, state: &mut State, tx: Sender<Msg>) -> Result<Option<imp
                     }
                 }));
             }
-            View::Loading => unreachable!(),
+            View::Loading => {},
         },
         Msg::Up => match &mut state.view_state {
             View::SubList(posts, ref mut list_state) => {
@@ -50,7 +50,7 @@ pub fn update(msg: Msg, state: &mut State, tx: Sender<Msg>) -> Result<Option<imp
                     }
                 }));
             }
-            View::Loading => unreachable!(),
+            View::Loading => {},
         },
         Msg::Quit => {
             bail!("Quitting"); // TODO: Better quiting path
