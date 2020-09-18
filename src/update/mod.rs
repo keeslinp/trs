@@ -1,26 +1,21 @@
 use crate::{
+    api::get_post_view,
     api::get_posts,
     msg::Msg,
     state::{State, View},
 };
-use anyhow::{bail, Error, Result};
-use flume::Sender;
-use futures::Future;
+use anyhow::{bail, Result};
+use futures::future::BoxFuture;
 use tui::widgets::ListState;
 
-pub fn update(
-    msg: Msg,
-    state: &mut State,
-    tx: Sender<Msg>,
-) -> Result<Option<impl Future<Output = Result<()>>>> {
+pub fn update(msg: Msg, state: &mut State) -> Result<Option<BoxFuture<'static, Result<Msg>>>> {
     match msg {
         Msg::FetchSubreddit(sub) => {
             state.view_state = View::Loading;
-            return Ok(Some(async move {
+            return Ok(Some(Box::pin(async move {
                 let posts = get_posts(sub.as_deref()).await?;
-                tx.send(Msg::SubredditResponse(posts)).map_err(Error::new)?;
-                Ok(())
-            }));
+                Ok(Msg::SubredditResponse(posts))
+            })));
         }
         Msg::SubredditResponse(posts) => {
             let mut list_state = ListState::default();
@@ -32,7 +27,7 @@ pub fn update(
         Msg::Error(e) => {
             bail!(e);
         }
-        Msg::Down => match &mut state.view_state {
+        Msg::Prev => match &mut state.view_state {
             View::SubList(posts, ref mut list_state) => {
                 list_state.select(list_state.selected().map(|s| {
                     if s < posts.len() - 1 {
@@ -44,7 +39,7 @@ pub fn update(
             }
             View::Loading => {}
         },
-        Msg::Up => match &mut state.view_state {
+        Msg::Next => match &mut state.view_state {
             View::SubList(_posts, ref mut list_state) => {
                 list_state.select(list_state.selected().map(|s| if s > 0 { s - 1 } else { s }));
             }
@@ -67,6 +62,24 @@ pub fn update(
             }
             View::Loading => {}
         },
+        Msg::Up => unimplemented!(),
+        Msg::Down => match &state.view_state {
+            View::SubList(posts, list_state) => {
+                if let Some(permalink) = list_state
+                    .selected()
+                    .and_then(|i| posts.get(i))
+                    .map(|post| post.permalink.clone())
+                {
+                    state.view_state = View::Loading;
+                    return Ok(Some(Box::pin(async move {
+                        let comments = get_post_view(permalink.as_str()).await?;
+                        Ok(Msg::CommentsResponse(comments))
+                    })));
+                }
+            }
+            View::Loading => {}
+        },
+        Msg::CommentsResponse(_) => todo!(),
     }
     Ok(None)
 }

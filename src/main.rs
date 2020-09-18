@@ -1,8 +1,8 @@
 use anyhow::Result;
 use futures::executor::ThreadPool;
 use futures::{
-    future::RemoteHandle,
-    task::{SpawnExt},
+    future::{FutureExt, RemoteHandle},
+    task::SpawnExt,
 };
 use std::io;
 use termion::raw::IntoRawMode;
@@ -30,8 +30,10 @@ fn handle_input(tx: flume::Sender<Msg>) {
         for key in lock.keys() {
             match key? {
                 Key::Char('q') => tx.send(Msg::Quit)?,
-                Key::Char('j') => tx.send(Msg::Down)?,
-                Key::Char('k') => tx.send(Msg::Up)?,
+                Key::Char('j') => tx.send(Msg::Prev)?,
+                Key::Char('k') => tx.send(Msg::Next)?,
+                Key::Char('l') => tx.send(Msg::Down)?,
+                Key::Char('h') => tx.send(Msg::Up)?,
                 Key::Char('\n') => tx.send(Msg::Select)?,
                 _ => {}
             }
@@ -51,10 +53,19 @@ fn main() -> Result<()> {
     tx.send(Msg::FetchSubreddit(None))?;
     terminal.clear()?;
     for msg in rx.iter() {
-        let maybe_future = update(msg, &mut state, tx.clone())?;
+        let maybe_future = update(msg, &mut state)?;
         if let Some(future) = maybe_future {
-            let handle: RemoteHandle<Result<()>> = pool.spawn_with_handle(future)?;
-            handle.forget();
+            let tx = tx.clone();
+            pool.spawn(future.then(|res| async move {
+                match res {
+                    Ok(next_msg) => {
+                        tx.send(next_msg).expect("failed to send async msg");
+                    },
+                    Err(err) => {
+                        tx.send(Msg::Error(err.to_string())).expect("failed to report error");
+                    }
+                }
+            }))?;
         }
         render(&mut terminal, &mut state)?;
     }
