@@ -2,7 +2,8 @@ use tui::{
     backend::Backend,
     layout::{Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
-    text::{Span, Text},
+    text::Span,
+    text::Spans,
     widgets::{Block, Borders, List, ListItem, ListState, Paragraph},
     Frame, Terminal,
 };
@@ -20,7 +21,15 @@ fn render_subreddit_view<'a, B: Backend>(
 ) {
     let items: Vec<ListItem> = posts
         .iter()
-        .map(|p| ListItem::new(p.title.as_str()))
+        .map(|p| {
+            ListItem::new(vec![
+                Spans::from(Span::from(p.title.as_str())),
+                Spans::from(Span::from(format!(
+                    "     {} comments, {} upvotes",
+                    p.num_comments, p.up_votes
+                ))),
+            ])
+        })
         .collect();
     let chunks = Layout::default()
         .direction(Direction::Vertical)

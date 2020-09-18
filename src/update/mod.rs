@@ -5,10 +5,14 @@ use crate::{
 };
 use anyhow::{bail, Error, Result};
 use flume::Sender;
-use tui::widgets::ListState;
 use futures::Future;
+use tui::widgets::ListState;
 
-pub fn update(msg: Msg, state: &mut State, tx: Sender<Msg>) -> Result<Option<impl Future<Output=Result<()>>>> {
+pub fn update(
+    msg: Msg,
+    state: &mut State,
+    tx: Sender<Msg>,
+) -> Result<Option<impl Future<Output = Result<()>>>> {
     match msg {
         Msg::FetchSubreddit(sub) => {
             state.view_state = View::Loading;
@@ -16,7 +20,7 @@ pub fn update(msg: Msg, state: &mut State, tx: Sender<Msg>) -> Result<Option<imp
                 let posts = get_posts(sub.as_ref().map(|s| s.as_str())).await?;
                 tx.send(Msg::SubredditResponse(posts)).map_err(Error::new)?;
                 Ok(())
-            }))
+            }));
         }
         Msg::SubredditResponse(posts) => {
             let mut list_state = ListState::default();
@@ -38,32 +42,31 @@ pub fn update(msg: Msg, state: &mut State, tx: Sender<Msg>) -> Result<Option<imp
                     }
                 }));
             }
-            View::Loading => {},
+            View::Loading => {}
         },
         Msg::Up => match &mut state.view_state {
             View::SubList(posts, ref mut list_state) => {
-                list_state.select(list_state.selected().map(|s| {
-                    if s > 0 {
-                        s - 1
-                    } else {
-                        s
-                    }
-                }));
+                list_state.select(list_state.selected().map(|s| if s > 0 { s - 1 } else { s }));
             }
-            View::Loading => {},
+            View::Loading => {}
         },
         Msg::Quit => {
             bail!("Quitting"); // TODO: Better quiting path
         }
         Msg::Select => match &state.view_state {
             View::SubList(posts, list_state) => {
-                if let Some(url) = list_state.selected().and_then(|i| posts.get(i)).map(|post| post.url.as_str()).and_then(|s| s.strip_prefix("\"")).and_then(|s| s.strip_suffix("\"")) {
+                if let Some(url) = list_state
+                    .selected()
+                    .and_then(|i| posts.get(i))
+                    .map(|post| post.url.as_str())
+                    .and_then(|s| s.strip_prefix("\""))
+                    .and_then(|s| s.strip_suffix("\""))
+                {
                     webbrowser::open(url)?;
                 }
-            },
-            View::Loading => {},
-            
-        }
+            }
+            View::Loading => {}
+        },
     }
     Ok(None)
 }

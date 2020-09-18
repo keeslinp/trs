@@ -1,12 +1,12 @@
 use anyhow::Result;
 use futures::executor::ThreadPool;
-use std::io;
-use termion::raw::IntoRawMode;
-use tui::{backend::TermionBackend, Terminal};
 use futures::{
     future::RemoteHandle,
     task::{Spawn, SpawnExt},
 };
+use std::io;
+use termion::raw::IntoRawMode;
+use tui::{backend::TermionBackend, Terminal};
 
 mod api;
 mod model;
