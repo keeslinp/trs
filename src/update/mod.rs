@@ -17,14 +17,14 @@ pub fn update(
         Msg::FetchSubreddit(sub) => {
             state.view_state = View::Loading;
             return Ok(Some(async move {
-                let posts = get_posts(sub.as_ref().map(|s| s.as_str())).await?;
+                let posts = get_posts(sub.as_deref()).await?;
                 tx.send(Msg::SubredditResponse(posts)).map_err(Error::new)?;
                 Ok(())
             }));
         }
         Msg::SubredditResponse(posts) => {
             let mut list_state = ListState::default();
-            if posts.len() > 0 {
+            if !posts.is_empty() {
                 list_state.select(Some(0));
             }
             state.view_state = View::SubList(posts, list_state);

@@ -56,7 +56,7 @@ fn main() -> Result<()> {
             let handle: RemoteHandle<Result<()>> = pool.spawn_with_handle(future)?;
             handle.forget();
         }
-        render(&mut terminal, &mut state);
+        render(&mut terminal, &mut state)?;
     }
     Ok(())
 }
