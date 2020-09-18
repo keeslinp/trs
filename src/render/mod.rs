@@ -10,15 +10,12 @@ use tui::{
 
 use crate::{
     model::Post,
+    model::PostView,
     state::{State, View},
 };
 use anyhow::Result;
 
-fn render_subreddit_view<'a, B: Backend>(
-    f: &mut Frame<B>,
-    posts: &[Post],
-    list_state: &mut ListState,
-) {
+fn render_subreddit_view<B: Backend>(f: &mut Frame<B>, posts: &[Post], list_state: &mut ListState) {
     let items: Vec<ListItem> = posts
         .iter()
         .map(|p| {
@@ -50,6 +47,29 @@ fn render_subreddit_view<'a, B: Backend>(
     f.render_widget(block, chunks[0]);
 }
 
+fn render_post_view(f: &mut Frame<impl Backend>, post_view: &PostView, list_state: &mut ListState) {
+    let items: Vec<ListItem> = post_view
+        .comments
+        .iter()
+        .map(|comment| {
+            ListItem::new(vec![
+                Spans::from(Span::from(comment.body.as_str())),
+                Spans::from(Span::from(format!("      {} upvotes", comment.up_votes))),
+            ])
+        })
+        .collect();
+    let list = List::new(items)
+        .block(Block::default().borders(Borders::ALL).title("List"))
+        .style(Style::default().fg(Color::White))
+        .highlight_style(
+            Style::default()
+                .bg(Color::LightGreen)
+                .add_modifier(Modifier::BOLD),
+        )
+        .highlight_symbol(">> ");
+    f.render_stateful_widget(list, f.size(), list_state);
+}
+
 fn render_loading<B: Backend>(f: &mut Frame<B>) {
     let text = Paragraph::new(Span::from("Loading..."));
     f.render_widget(text, f.size());
@@ -63,6 +83,9 @@ pub fn render<B: Backend>(terminal: &mut Terminal<B>, state: &mut State) -> Resu
             }
             View::SubList(ref posts, ref mut list_state) => {
                 render_subreddit_view(f, posts, list_state);
+            }
+            View::PostView(ref post_view, ref mut list_state) => {
+                render_post_view(f, post_view, list_state);
             }
         };
     })?;

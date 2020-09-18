@@ -1,9 +1,6 @@
 use anyhow::Result;
 use futures::executor::ThreadPool;
-use futures::{
-    future::{FutureExt, RemoteHandle},
-    task::SpawnExt,
-};
+use futures::{future::FutureExt, task::SpawnExt};
 use std::io;
 use termion::raw::IntoRawMode;
 use tui::{backend::TermionBackend, Terminal};
@@ -30,8 +27,8 @@ fn handle_input(tx: flume::Sender<Msg>) {
         for key in lock.keys() {
             match key? {
                 Key::Char('q') => tx.send(Msg::Quit)?,
-                Key::Char('j') => tx.send(Msg::Prev)?,
-                Key::Char('k') => tx.send(Msg::Next)?,
+                Key::Char('j') => tx.send(Msg::Next)?,
+                Key::Char('k') => tx.send(Msg::Prev)?,
                 Key::Char('l') => tx.send(Msg::Down)?,
                 Key::Char('h') => tx.send(Msg::Up)?,
                 Key::Char('\n') => tx.send(Msg::Select)?,
@@ -60,9 +57,10 @@ fn main() -> Result<()> {
                 match res {
                     Ok(next_msg) => {
                         tx.send(next_msg).expect("failed to send async msg");
-                    },
+                    }
                     Err(err) => {
-                        tx.send(Msg::Error(err.to_string())).expect("failed to report error");
+                        tx.send(Msg::Error(err.to_string()))
+                            .expect("failed to report error");
                     }
                 }
             }))?;

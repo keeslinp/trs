@@ -40,11 +40,12 @@ fn parse_comments(raw_value: &Value) -> Result<Vec<Comment>> {
         .map(|raw_comments| {
             raw_comments
                 .iter()
+                .filter_map(|child| child.get("data"))
                 .filter_map(|raw_comment| {
                     Some(Comment {
                         body: raw_comment["body"].to_string(),
                         up_votes: raw_comment["ups"].as_i64()?,
-                        replies: parse_comments(&raw_comment["replies"]).ok()?,
+                        replies: parse_comments(&raw_comment["replies"]).unwrap_or(Vec::new()),
                     })
                 })
                 .collect()
@@ -53,7 +54,7 @@ fn parse_comments(raw_value: &Value) -> Result<Vec<Comment>> {
 }
 
 pub async fn get_post_view(permalink: &str) -> Result<PostView> {
-    let data: Value = surf::get(format!("https://www.reddit.com/{}", permalink))
+    let data: Value = surf::get(format!("https://www.reddit.com{}.json", permalink))
         .set_header("User-agent", "RTS 0.1")
         .recv_json()
         .await
@@ -70,7 +71,7 @@ pub async fn get_post_view(permalink: &str) -> Result<PostView> {
                     let post = post["data"]["children"][0]["data"].as_object();
                     Some(PostView {
                         self_text: post.and_then(|post| {
-                            Some((post["selftext"].to_string(), post["up_votes"].as_i64()?))
+                            Some((post["selftext"].to_string(), post["ups"].as_i64()?))
                         }),
                         comments: parse_comments(raw_comments).ok()?,
                     })

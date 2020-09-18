@@ -27,7 +27,7 @@ pub fn update(msg: Msg, state: &mut State) -> Result<Option<BoxFuture<'static, R
         Msg::Error(e) => {
             bail!(e);
         }
-        Msg::Prev => match &mut state.view_state {
+        Msg::Next => match &mut state.view_state {
             View::SubList(posts, ref mut list_state) => {
                 list_state.select(list_state.selected().map(|s| {
                     if s < posts.len() - 1 {
@@ -37,10 +37,22 @@ pub fn update(msg: Msg, state: &mut State) -> Result<Option<BoxFuture<'static, R
                     }
                 }));
             }
+            View::PostView(post_view, ref mut list_state) => {
+                list_state.select(list_state.selected().map(|s| {
+                    if s < post_view.comments.len() {
+                        s + 1
+                    } else {
+                        s
+                    }
+                }));
+            }
             View::Loading => {}
         },
-        Msg::Next => match &mut state.view_state {
+        Msg::Prev => match &mut state.view_state {
             View::SubList(_posts, ref mut list_state) => {
+                list_state.select(list_state.selected().map(|s| if s > 0 { s - 1 } else { s }));
+            }
+            View::PostView(_post_view, ref mut list_state) => {
                 list_state.select(list_state.selected().map(|s| if s > 0 { s - 1 } else { s }));
             }
             View::Loading => {}
@@ -60,15 +72,24 @@ pub fn update(msg: Msg, state: &mut State) -> Result<Option<BoxFuture<'static, R
                     webbrowser::open(url)?;
                 }
             }
+            View::PostView(_, _) => todo!(),
             View::Loading => {}
         },
         Msg::Up => unimplemented!(),
         Msg::Down => match &state.view_state {
             View::SubList(posts, list_state) => {
-                if let Some(permalink) = list_state
-                    .selected()
-                    .and_then(|i| posts.get(i))
-                    .map(|post| post.permalink.clone())
+                if let Some(permalink) =
+                    list_state
+                        .selected()
+                        .and_then(|i| posts.get(i))
+                        .and_then(|post| {
+                            Some(
+                                post.permalink
+                                    .strip_suffix("\"")?
+                                    .strip_prefix("\"")?
+                                    .to_string(),
+                            )
+                        })
                 {
                     state.view_state = View::Loading;
                     return Ok(Some(Box::pin(async move {
@@ -77,9 +98,16 @@ pub fn update(msg: Msg, state: &mut State) -> Result<Option<BoxFuture<'static, R
                     })));
                 }
             }
+            View::PostView(_, _) => todo!(),
             View::Loading => {}
         },
-        Msg::CommentsResponse(_) => todo!(),
+        Msg::CommentsResponse(post_view) => {
+            let mut list_state = ListState::default();
+            if !post_view.comments.is_empty() {
+                list_state.select(Some(0));
+            }
+            state.view_state = dbg!(View::PostView(post_view, list_state));
+        }
     }
     Ok(None)
 }
