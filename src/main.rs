@@ -2,7 +2,7 @@ use anyhow::Result;
 use futures::executor::ThreadPool;
 use futures::{
     future::RemoteHandle,
-    task::{Spawn, SpawnExt},
+    task::{SpawnExt},
 };
 use std::io;
 use termion::raw::IntoRawMode;

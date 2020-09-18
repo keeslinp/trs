@@ -45,7 +45,7 @@ pub fn update(
             View::Loading => {}
         },
         Msg::Up => match &mut state.view_state {
-            View::SubList(posts, ref mut list_state) => {
+            View::SubList(_posts, ref mut list_state) => {
                 list_state.select(list_state.selected().map(|s| if s > 0 { s - 1 } else { s }));
             }
             View::Loading => {}
