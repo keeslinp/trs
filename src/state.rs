@@ -2,19 +2,15 @@ use crate::model::{Post, PostView};
 use tui::widgets::ListState;
 
 #[derive(Debug)]
-pub enum View {
+pub enum State {
     SubList(Vec<Post>, ListState),
     PostView(PostView, ListState),
     Loading,
+    SelectSubreddit(String),
 }
 
-#[derive(Default)]
-pub struct State {
-    pub view_state: View,
-}
-
-impl Default for View {
-    fn default() -> View {
-        View::Loading
+impl Default for State {
+    fn default() -> Self {
+        State::Loading
     }
 }

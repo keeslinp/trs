@@ -1,4 +1,5 @@
 use crate::model::{Post, PostView};
+use termion::event::Key;
 
 #[derive(Debug)]
 pub enum Msg {
@@ -6,11 +7,5 @@ pub enum Msg {
     SubredditResponse(Vec<Post>),
     Error(String),
     CommentsResponse(PostView),
-    Prev,
-    Next,
-    Select,
-    Quit,
-    //TODO: Is this a good name?
-    Up,   // Shallower
-    Down, // Deeper
+    Input(Key),
 }

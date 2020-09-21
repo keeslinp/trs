@@ -2,112 +2,114 @@ use crate::{
     api::get_post_view,
     api::get_posts,
     msg::Msg,
-    state::{State, View},
+    state::State,
 };
 use anyhow::{bail, Result};
 use futures::future::BoxFuture;
 use tui::widgets::ListState;
+use termion::event::Key;
 
-pub fn update(msg: Msg, state: &mut State) -> Result<Option<BoxFuture<'static, Result<Msg>>>> {
-    match msg {
-        Msg::FetchSubreddit(sub) => {
-            state.view_state = View::Loading;
+pub fn update(msg: Msg, mut state: &mut State) -> Result<Option<BoxFuture<'static, Result<Msg>>>> {
+    match (&mut state, msg) {
+        (_, Msg::Error(e)) => {
+            bail!(e);
+        }
+        (_, Msg::FetchSubreddit(sub)) => {
+            *state = State::Loading;
             return Ok(Some(Box::pin(async move {
                 let posts = get_posts(sub.as_deref()).await?;
                 Ok(Msg::SubredditResponse(posts))
             })));
         }
-        Msg::SubredditResponse(posts) => {
+        (State::Loading, Msg::SubredditResponse(posts)) => {
             let mut list_state = ListState::default();
             if !posts.is_empty() {
                 list_state.select(Some(0));
             }
-            state.view_state = View::SubList(posts, list_state);
+            *state = State::SubList(posts, list_state);
         }
-        Msg::Error(e) => {
-            bail!(e);
+        (State::SubList(posts, ref mut list_state), Msg::Input(Key::Char('j'))) => {
+            list_state.select(list_state.selected().map(|s| {
+                if s < posts.len() - 1 {
+                    s + 1
+                } else {
+                    s
+                }
+            }));
         }
-        Msg::Next => match &mut state.view_state {
-            View::SubList(posts, ref mut list_state) => {
-                list_state.select(list_state.selected().map(|s| {
-                    if s < posts.len() - 1 {
-                        s + 1
-                    } else {
-                        s
-                    }
-                }));
-            }
-            View::PostView(post_view, ref mut list_state) => {
-                list_state.select(list_state.selected().map(|s| {
-                    if s < post_view.comments.len() {
-                        s + 1
-                    } else {
-                        s
-                    }
-                }));
-            }
-            View::Loading => {}
-        },
-        Msg::Prev => match &mut state.view_state {
-            View::SubList(_posts, ref mut list_state) => {
-                list_state.select(list_state.selected().map(|s| if s > 0 { s - 1 } else { s }));
-            }
-            View::PostView(_post_view, ref mut list_state) => {
-                list_state.select(list_state.selected().map(|s| if s > 0 { s - 1 } else { s }));
-            }
-            View::Loading => {}
-        },
-        Msg::Quit => {
-            bail!("Quitting"); // TODO: Better quiting path
+        (State::PostView(post_view, ref mut list_state), Msg::Input(Key::Char('j'))) => {
+            list_state.select(list_state.selected().map(|s| {
+                if s < post_view.comments.len() {
+                    s + 1
+                } else {
+                    s
+                }
+            }));
         }
-        Msg::Select => match &state.view_state {
-            View::SubList(posts, list_state) => {
-                if let Some(url) = list_state
+        (State::SubList(_posts, ref mut list_state), Msg::Input(Key::Char('k'))) => {
+            list_state.select(list_state.selected().map(|s| if s > 0 { s - 1 } else { s }));
+        }
+        (State::PostView(_post_view, ref mut list_state), Msg::Input(Key::Char('k'))) => {
+            list_state.select(list_state.selected().map(|s| if s > 0 { s - 1 } else { s }));
+        }
+        (State::SubList(posts, list_state), Msg::Input(Key::Char('\n'))) => {
+            if let Some(url) = list_state
+                .selected()
+                .and_then(|i| posts.get(i))
+                .map(|post| post.url.as_str())
+                .and_then(|s| s.strip_prefix("\""))
+                .and_then(|s| s.strip_suffix("\""))
+            {
+                webbrowser::open(url)?;
+            }
+        }
+        (State::SubList(posts, list_state), Msg::Input(Key::Char('l'))) => {
+            if let Some(permalink) =
+                list_state
                     .selected()
                     .and_then(|i| posts.get(i))
-                    .map(|post| post.url.as_str())
-                    .and_then(|s| s.strip_prefix("\""))
-                    .and_then(|s| s.strip_suffix("\""))
-                {
-                    webbrowser::open(url)?;
-                }
+                    .and_then(|post| {
+                        Some(
+                            post.permalink
+                                .strip_suffix("\"")?
+                                .strip_prefix("\"")?
+                                .to_string(),
+                        )
+                    })
+            {
+                *state = State::Loading;
+                return Ok(Some(Box::pin(async move {
+                    let comments = get_post_view(permalink.as_str()).await?;
+                    Ok(Msg::CommentsResponse(comments))
+                })));
             }
-            View::PostView(_, _) => todo!(),
-            View::Loading => {}
-        },
-        Msg::Up => unimplemented!(),
-        Msg::Down => match &state.view_state {
-            View::SubList(posts, list_state) => {
-                if let Some(permalink) =
-                    list_state
-                        .selected()
-                        .and_then(|i| posts.get(i))
-                        .and_then(|post| {
-                            Some(
-                                post.permalink
-                                    .strip_suffix("\"")?
-                                    .strip_prefix("\"")?
-                                    .to_string(),
-                            )
-                        })
-                {
-                    state.view_state = View::Loading;
-                    return Ok(Some(Box::pin(async move {
-                        let comments = get_post_view(permalink.as_str()).await?;
-                        Ok(Msg::CommentsResponse(comments))
-                    })));
-                }
-            }
-            View::PostView(_, _) => todo!(),
-            View::Loading => {}
-        },
-        Msg::CommentsResponse(post_view) => {
+        }
+        (State::Loading, Msg::CommentsResponse(post_view)) => {
             let mut list_state = ListState::default();
             if !post_view.comments.is_empty() {
                 list_state.select(Some(0));
             }
-            state.view_state = dbg!(View::PostView(post_view, list_state));
+            *state = State::PostView(post_view, list_state);
         }
+        (State::SelectSubreddit(prompt), Msg::Input(Key::Char('\n'))) => {
+            return update(Msg::FetchSubreddit(Some(prompt.clone())), state);
+        }
+        (State::SelectSubreddit(ref mut prompt), Msg::Input(Key::Backspace)) => {
+            prompt.pop();
+        }
+        (State::SelectSubreddit(ref mut prompt), Msg::Input(Key::Char(c))) => {
+            prompt.push(c);
+        }
+        (_, Msg::Input(Key::Char('q'))) => {
+            bail!("Quitting"); // TODO: Better quiting path
+        }
+        (_, Msg::Input(Key::Ctrl('c'))) => {
+            bail!("Quitting"); // TODO: Better quiting path
+        }
+        (_, Msg::Input(Key::Char('/'))) => {
+            *state = State::SelectSubreddit(String::new());
+        }
+        (_, _) => {}
     }
     Ok(None)
 }

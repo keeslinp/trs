@@ -11,7 +11,7 @@ use tui::{
 use crate::{
     model::Post,
     model::PostView,
-    state::{State, View},
+    state::State,
 };
 use anyhow::Result;
 
@@ -75,17 +75,25 @@ fn render_loading<B: Backend>(f: &mut Frame<B>) {
     f.render_widget(text, f.size());
 }
 
+fn render_select_subreddit(f: &mut Frame<impl Backend>, prompt: &str) {
+    let text = Paragraph::new(Spans::from(vec![Span::from("/r/"), Span::from(prompt)]));
+    f.render_widget(text, f.size());
+}
+
 pub fn render<B: Backend>(terminal: &mut Terminal<B>, state: &mut State) -> Result<()> {
     terminal.draw(|f| {
-        match state.view_state {
-            View::Loading => {
+        match state {
+            State::Loading => {
                 render_loading(f);
             }
-            View::SubList(ref posts, ref mut list_state) => {
+            State::SubList(ref posts, ref mut list_state) => {
                 render_subreddit_view(f, posts, list_state);
             }
-            View::PostView(ref post_view, ref mut list_state) => {
+            State::PostView(ref post_view, ref mut list_state) => {
                 render_post_view(f, post_view, list_state);
+            }
+            State::SelectSubreddit(ref prompt) => {
+                render_select_subreddit(f, prompt);
             }
         };
     })?;

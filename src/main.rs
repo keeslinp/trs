@@ -25,14 +25,8 @@ fn handle_input(tx: flume::Sender<Msg>) {
         let stdin = io::stdin();
         let lock = stdin.lock();
         for key in lock.keys() {
-            match key? {
-                Key::Char('q') => tx.send(Msg::Quit)?,
-                Key::Char('j') => tx.send(Msg::Next)?,
-                Key::Char('k') => tx.send(Msg::Prev)?,
-                Key::Char('l') => tx.send(Msg::Down)?,
-                Key::Char('h') => tx.send(Msg::Up)?,
-                Key::Char('\n') => tx.send(Msg::Select)?,
-                _ => {}
+            if let Ok(key) = key {
+                tx.send(Msg::Input(key))?;
             }
         }
         Ok(())
