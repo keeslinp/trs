@@ -21,7 +21,7 @@ fn handle_input(tx: flume::Sender<Msg>) {
     use std::thread::JoinHandle;
 
     let _: JoinHandle<Result<()>> = std::thread::spawn(move || {
-        use termion::{event::Key, input::TermRead};
+        use termion::input::TermRead;
         let stdin = io::stdin();
         let lock = stdin.lock();
         for key in lock.keys() {
@@ -37,14 +37,14 @@ fn main() -> Result<()> {
     let stdout = io::stdout().into_raw_mode()?;
     let backend = TermionBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
-    let mut state = State::default();
+    let mut state_stack = vec![State::default()];
     let (tx, rx) = flume::unbounded();
     let pool = ThreadPool::new()?;
     handle_input(tx.clone());
     tx.send(Msg::FetchSubreddit(None))?;
     terminal.clear()?;
     for msg in rx.iter() {
-        let maybe_future = update(msg, &mut state)?;
+        let maybe_future = update(msg, &mut state_stack)?;
         if let Some(future) = maybe_future {
             let tx = tx.clone();
             pool.spawn(future.then(|res| async move {
@@ -59,7 +59,7 @@ fn main() -> Result<()> {
                 }
             }))?;
         }
-        render(&mut terminal, &mut state)?;
+        render(&mut terminal, &mut state_stack.as_mut_slice())?;
     }
     Ok(())
 }

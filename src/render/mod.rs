@@ -1,21 +1,13 @@
-use tui::{
-    backend::Backend,
-    layout::{Constraint, Direction, Layout},
-    style::{Color, Modifier, Style},
-    text::Span,
-    text::Spans,
-    widgets::{Block, Borders, List, ListItem, ListState, Paragraph},
-    Frame, Terminal,
-};
+use tui::{Frame, Terminal, backend::Backend, layout::{Constraint, Direction, Layout, Rect}, style::{Color, Modifier, Style}, text::Span, text::Spans, widgets::{Block, Borders, List, ListItem, ListState, Paragraph}};
 
 use crate::{
     model::Post,
     model::PostView,
     state::State,
 };
-use anyhow::Result;
+use anyhow::{Result, bail};
 
-fn render_subreddit_view<B: Backend>(f: &mut Frame<B>, posts: &[Post], list_state: &mut ListState) {
+fn render_subreddit_view<B: Backend>(f: &mut Frame<B>, size: Rect, posts: &[Post], list_state: &mut ListState) {
     let items: Vec<ListItem> = posts
         .iter()
         .map(|p| {
@@ -28,12 +20,6 @@ fn render_subreddit_view<B: Backend>(f: &mut Frame<B>, posts: &[Post], list_stat
             ])
         })
         .collect();
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .margin(1)
-        .constraints([Constraint::Percentage(80), Constraint::Percentage(10)].as_ref())
-        .split(f.size());
-    let block = Block::default();
     let list = List::new(items)
         .block(Block::default().borders(Borders::ALL).title("List"))
         .style(Style::default().fg(Color::White))
@@ -43,11 +29,10 @@ fn render_subreddit_view<B: Backend>(f: &mut Frame<B>, posts: &[Post], list_stat
                 .add_modifier(Modifier::BOLD),
         )
         .highlight_symbol(">> ");
-    f.render_stateful_widget(list, block.inner(chunks[0]), list_state);
-    f.render_widget(block, chunks[0]);
+    f.render_stateful_widget(list, size, list_state);
 }
 
-fn render_post_view(f: &mut Frame<impl Backend>, post_view: &PostView, list_state: &mut ListState) {
+fn render_post_view(f: &mut Frame<impl Backend>, size: Rect, post_view: &PostView, list_state: &mut ListState) {
     let items: Vec<ListItem> = post_view
         .comments
         .iter()
@@ -67,7 +52,7 @@ fn render_post_view(f: &mut Frame<impl Backend>, post_view: &PostView, list_stat
                 .add_modifier(Modifier::BOLD),
         )
         .highlight_symbol(">> ");
-    f.render_stateful_widget(list, f.size(), list_state);
+    f.render_stateful_widget(list, size, list_state);
 }
 
 fn render_loading<B: Backend>(f: &mut Frame<B>) {
@@ -75,27 +60,39 @@ fn render_loading<B: Backend>(f: &mut Frame<B>) {
     f.render_widget(text, f.size());
 }
 
-fn render_select_subreddit(f: &mut Frame<impl Backend>, prompt: &str) {
+fn render_select_subreddit(f: &mut Frame<impl Backend>, size: Rect, prompt: &str, stack_tail: &mut[State]) {
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Max(size.height - 1), Constraint::Max(1)])
+        .split(size);
+
     let text = Paragraph::new(Spans::from(vec![Span::from("/r/"), Span::from(prompt)]));
-    f.render_widget(text, f.size());
+    render_frame(f, chunks[0], stack_tail);
+    f.render_widget(text, chunks[1]);
 }
 
-pub fn render<B: Backend>(terminal: &mut Terminal<B>, state: &mut State) -> Result<()> {
+pub fn render_frame(f: &mut Frame<impl Backend>, size: Rect, state_stack: &mut[State]) {
+    match state_stack {
+        [.., State::Loading] => {
+            render_loading(f);
+        }
+        [.., State::SubList(ref posts, ref mut list_state)] => {
+            render_subreddit_view(f, size, posts, list_state);
+        }
+        [.., State::PostView(ref post_view, ref mut list_state)] => {
+            render_post_view(f, size, post_view, list_state);
+        }
+        [old_stack @ .., State::SelectSubreddit(ref prompt)] => {
+            render_select_subreddit(f, size, prompt, old_stack);
+        }
+        [] => {
+        }
+    };
+}
+
+pub fn render<B: Backend>(terminal: &mut Terminal<B>, state_stack: &mut [State]) -> Result<()> {
     terminal.draw(|f| {
-        match state {
-            State::Loading => {
-                render_loading(f);
-            }
-            State::SubList(ref posts, ref mut list_state) => {
-                render_subreddit_view(f, posts, list_state);
-            }
-            State::PostView(ref post_view, ref mut list_state) => {
-                render_post_view(f, post_view, list_state);
-            }
-            State::SelectSubreddit(ref prompt) => {
-                render_select_subreddit(f, prompt);
-            }
-        };
+        render_frame(f, f.size(), state_stack);
     })?;
     Ok(())
 }
