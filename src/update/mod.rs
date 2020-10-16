@@ -1,15 +1,13 @@
-use crate::{
-    api::get_post_view,
-    api::get_posts,
-    msg::Msg,
-    state::State,
-};
+use crate::{api::get_post_view, api::get_posts, msg::Msg, state::State};
 use anyhow::{bail, Result};
 use futures::future::BoxFuture;
-use tui::widgets::ListState;
 use termion::event::Key;
+use tui::widgets::ListState;
 
-pub fn update(msg: Msg, state_stack: &mut Vec<State>) -> Result<Option<BoxFuture<'static, Result<Msg>>>> {
+pub fn update(
+    msg: Msg,
+    state_stack: &mut Vec<State>,
+) -> Result<Option<BoxFuture<'static, Result<Msg>>>> {
     let last_state_index = state_stack.len() - 1;
     match (state_stack.as_mut_slice(), msg) {
         (_, Msg::Error(e)) => {
@@ -22,7 +20,7 @@ pub fn update(msg: Msg, state_stack: &mut Vec<State>) -> Result<Option<BoxFuture
                 Ok(Msg::SubredditResponse(posts))
             })));
         }
-        ([..,State::Loading], Msg::SubredditResponse(posts)) => {
+        ([.., State::Loading], Msg::SubredditResponse(posts)) => {
             let mut list_state = ListState::default();
             if !posts.is_empty() {
                 list_state.select(Some(0));

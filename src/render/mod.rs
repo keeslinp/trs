@@ -1,23 +1,44 @@
-use tui::{Frame, Terminal, backend::Backend, layout::{Constraint, Direction, Layout, Rect}, style::{Color, Modifier, Style}, text::Span, text::Spans, widgets::{Block, Borders, List, ListItem, ListState, Paragraph}};
-
-use crate::{
-    model::Post,
-    model::PostView,
-    state::State,
+use tui::{
+    backend::Backend,
+    layout::{Constraint, Direction, Layout, Rect},
+    style::{Color, Modifier, Style},
+    text::Span,
+    text::Spans,
+    widgets::{Block, Borders, List, ListItem, ListState, Paragraph},
+    Frame, Terminal,
 };
-use anyhow::{Result, bail};
 
-fn render_subreddit_view<B: Backend>(f: &mut Frame<B>, size: Rect, posts: &[Post], list_state: &mut ListState) {
+use crate::{model::Post, model::PostView, state::State};
+use anyhow::{bail, Result};
+
+use snailquote::unescape;
+use textwrap::wrap;
+
+fn wrap_text<'a>(s: &'a str, rect: Rect) -> Vec<Spans<'a>> {
+    unescape(s)
+        .expect("failed to escape string")
+        .lines()
+        .map(|line| wrap(line, rect.width as usize - 7).into_iter())
+        .flatten()
+        .map(|line| Spans::from(Span::from(String::from(line))))
+        .collect() // TODO: Less froms?
+}
+
+fn render_subreddit_view<B: Backend>(
+    f: &mut Frame<B>,
+    size: Rect,
+    posts: &[Post],
+    list_state: &mut ListState,
+) {
     let items: Vec<ListItem> = posts
         .iter()
         .map(|p| {
-            ListItem::new(vec![
-                Spans::from(Span::from(p.title.as_str())),
-                Spans::from(Span::from(format!(
-                    "     {} comments, {} upvotes",
-                    p.num_comments, p.up_votes
-                ))),
-            ])
+            let mut spans = wrap_text(p.title.as_str(), size);
+            spans.push(Spans::from(Span::from(format!(
+                "     {} comments, {} upvotes",
+                p.num_comments, p.up_votes
+            ))));
+            ListItem::new(spans)
         })
         .collect();
     let list = List::new(items)
@@ -32,15 +53,22 @@ fn render_subreddit_view<B: Backend>(f: &mut Frame<B>, size: Rect, posts: &[Post
     f.render_stateful_widget(list, size, list_state);
 }
 
-fn render_post_view(f: &mut Frame<impl Backend>, size: Rect, post_view: &PostView, list_state: &mut ListState) {
+fn render_post_view(
+    f: &mut Frame<impl Backend>,
+    size: Rect,
+    post_view: &PostView,
+    list_state: &mut ListState,
+) {
     let items: Vec<ListItem> = post_view
         .comments
         .iter()
         .map(|comment| {
-            ListItem::new(vec![
-                Spans::from(Span::from(comment.body.as_str())),
-                Spans::from(Span::from(format!("      {} upvotes", comment.up_votes))),
-            ])
+            let mut spans = wrap_text(comment.body.as_str(), size);
+            spans.push(Spans::from(Span::from(format!(
+                "      {} upvotes",
+                comment.up_votes
+            ))));
+            ListItem::new(spans)
         })
         .collect();
     let list = List::new(items)
@@ -60,7 +88,12 @@ fn render_loading<B: Backend>(f: &mut Frame<B>) {
     f.render_widget(text, f.size());
 }
 
-fn render_select_subreddit(f: &mut Frame<impl Backend>, size: Rect, prompt: &str, stack_tail: &mut[State]) {
+fn render_select_subreddit(
+    f: &mut Frame<impl Backend>,
+    size: Rect,
+    prompt: &str,
+    stack_tail: &mut [State],
+) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Max(size.height - 1), Constraint::Max(1)])
@@ -71,7 +104,7 @@ fn render_select_subreddit(f: &mut Frame<impl Backend>, size: Rect, prompt: &str
     f.render_widget(text, chunks[1]);
 }
 
-pub fn render_frame(f: &mut Frame<impl Backend>, size: Rect, state_stack: &mut[State]) {
+pub fn render_frame(f: &mut Frame<impl Backend>, size: Rect, state_stack: &mut [State]) {
     match state_stack {
         [.., State::Loading] => {
             render_loading(f);
@@ -85,8 +118,7 @@ pub fn render_frame(f: &mut Frame<impl Backend>, size: Rect, state_stack: &mut[S
         [old_stack @ .., State::SelectSubreddit(ref prompt)] => {
             render_select_subreddit(f, size, prompt, old_stack);
         }
-        [] => {
-        }
+        [] => {}
     };
 }
 
