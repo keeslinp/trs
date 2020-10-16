@@ -5,7 +5,7 @@ use serde_json::Value;
 pub async fn get_posts(subreddit: Option<&str>) -> Result<Vec<Post>> {
     let subreddit_chunk = subreddit
         .map(|subreddit| format!("r/{}/", subreddit))
-        .unwrap_or("".to_owned());
+        .unwrap_or_else(|| "".to_owned());
     let data: Value = surf::get(format!(
         "https://www.reddit.com/{}best.json",
         subreddit_chunk
@@ -30,7 +30,7 @@ pub async fn get_posts(subreddit: Option<&str>) -> Result<Vec<Post>> {
                 })
             })
         })
-        .ok_or(anyhow!("Failed to parse post list"))?
+        .ok_or_else(|| anyhow!("Failed to parse post list"))?
         .collect())
 }
 
@@ -45,12 +45,12 @@ fn parse_comments(raw_value: &Value) -> Result<Vec<Comment>> {
                     Some(Comment {
                         body: raw_comment["body"].to_string(),
                         up_votes: raw_comment["ups"].as_i64()?,
-                        replies: parse_comments(&raw_comment["replies"]).unwrap_or(Vec::new()),
+                        replies: parse_comments(&raw_comment["replies"]).unwrap_or_default(),
                     })
                 })
                 .collect()
         })
-        .ok_or(anyhow!("Failed to parse comments"))
+        .ok_or_else(|| anyhow!("Failed to parse comments"))
 }
 
 pub async fn get_post_view(permalink: &str) -> Result<PostView> {
@@ -79,5 +79,5 @@ pub async fn get_post_view(permalink: &str) -> Result<PostView> {
                 _ => unreachable!(), // There should be at least one
             }
         })
-        .ok_or(anyhow!("Failed to parse post"))
+        .ok_or_else(|| anyhow!("Failed to parse post"))
 }

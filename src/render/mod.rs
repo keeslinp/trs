@@ -9,7 +9,7 @@ use tui::{
 };
 
 use crate::{model::Post, model::PostView, state::State};
-use anyhow::{bail, Result};
+use anyhow::Result;
 
 use snailquote::unescape;
 use textwrap::wrap;
