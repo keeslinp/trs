@@ -17,17 +17,20 @@ pub fn update(
             state_stack.push(State::Loading);
             return Ok(Some(Box::pin(async move {
                 let posts = get_posts(sub.as_deref()).await?;
-                Ok(Msg::SubredditResponse(posts))
+                Ok(Msg::SubredditResponse(posts, sub))
             })));
         }
-        ([.., State::Loading], Msg::SubredditResponse(posts)) => {
+        ([.., State::Loading], Msg::SubredditResponse(posts, sub)) => {
             let mut list_state = ListState::default();
             if !posts.is_empty() {
                 list_state.select(Some(0));
             }
-            state_stack[last_state_index] = State::SubList(posts, list_state);
+            state_stack[last_state_index] = State::SubList(posts, list_state, sub);
         }
-        ([.., State::SubList(posts, ref mut list_state)], Msg::Input(Key::Char('j'))) => {
+        ([.., State::SubList(_, _, sub)], Msg::Input(Key::Char('r'))) => {
+            return update(Msg::FetchSubreddit(sub.clone()), state_stack);
+        }
+        ([.., State::SubList(posts, ref mut list_state, _)], Msg::Input(Key::Char('j'))) => {
             list_state.select(list_state.selected().map(|s| {
                 if s < posts.len() - 1 {
                     s + 1
@@ -45,7 +48,7 @@ pub fn update(
                 }
             }));
         }
-        ([.., State::SubList(_posts, ref mut list_state)], Msg::Input(Key::Char('k'))) => {
+        ([.., State::SubList(_posts, ref mut list_state, _)], Msg::Input(Key::Char('k'))) => {
             list_state.select(list_state.selected().map(|s| if s > 0 { s - 1 } else { s }));
         }
         ([.., State::PostView(_post_view, ref mut list_state)], Msg::Input(Key::Char('k'))) => {
@@ -54,7 +57,7 @@ pub fn update(
         ([.., State::PostView(_, _)], Msg::Input(Key::Char('h'))) => {
             state_stack.pop();
         }
-        ([.., State::SubList(posts, list_state)], Msg::Input(Key::Char('\n'))) => {
+        ([.., State::SubList(posts, list_state, _)], Msg::Input(Key::Char('\n'))) => {
             if let Some(url) = list_state
                 .selected()
                 .and_then(|i| posts.get(i))
@@ -65,7 +68,7 @@ pub fn update(
                 webbrowser::open(url)?;
             }
         }
-        ([.., State::SubList(posts, list_state)], Msg::Input(Key::Char('l'))) => {
+        ([.., State::SubList(posts, list_state, _)], Msg::Input(Key::Char('l'))) => {
             if let Some(permalink) =
                 list_state
                     .selected()

@@ -3,7 +3,7 @@ use tui::widgets::ListState;
 
 #[derive(Debug)]
 pub enum State {
-    SubList(Vec<Post>, ListState),
+    SubList(Vec<Post>, ListState, Option<String>),
     PostView(PostView, ListState),
     Loading,
     SelectSubreddit(String),

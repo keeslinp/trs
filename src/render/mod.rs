@@ -109,7 +109,7 @@ pub fn render_frame(f: &mut Frame<impl Backend>, size: Rect, state_stack: &mut [
         [.., State::Loading] => {
             render_loading(f);
         }
-        [.., State::SubList(ref posts, ref mut list_state)] => {
+        [.., State::SubList(ref posts, ref mut list_state, _sub)] => {
             render_subreddit_view(f, size, posts, list_state);
         }
         [.., State::PostView(ref post_view, ref mut list_state)] => {
