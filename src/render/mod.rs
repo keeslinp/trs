@@ -59,18 +59,29 @@ fn render_post_view(
     post_view: &PostView,
     list_state: &mut ListState,
 ) {
-    let items: Vec<ListItem> = post_view
-        .comments
-        .iter()
-        .map(|comment| {
-            let mut spans = wrap_text(comment.body.as_str(), size);
-            spans.push(Spans::from(Span::from(format!(
-                "      {} upvotes",
-                comment.up_votes
-            ))));
-            ListItem::new(spans)
-        })
-        .collect();
+    use std::iter::once;
+    let items: Vec<ListItem> = once(
+        post_view
+            .self_text
+            .as_ref()
+            .map(|(body, up)| (&*body.as_str(), *up)),
+    )
+    .filter_map(|self_text| self_text)
+    .chain(
+        post_view
+            .comments
+            .iter()
+            .map(|comment| (comment.body.as_str(), comment.up_votes)),
+    )
+    .map(|(body, up_votes)| {
+        let mut spans = wrap_text(body, size);
+        spans.push(Spans::from(Span::from(format!(
+            "      {} upvotes",
+            up_votes
+        ))));
+        ListItem::new(spans)
+    })
+    .collect();
     let list = List::new(items)
         .block(Block::default().borders(Borders::ALL).title("List"))
         .style(Style::default().fg(Color::White))
